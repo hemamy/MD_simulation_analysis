@@ -1,0 +1,90 @@
+# initial setup
+units		lj
+dimension 3
+boundary  p p p
+
+atom_style	angle
+# seting up variables
+
+variable        Tf equal 0.50
+variable        Ti equal 0.50
+variable        Pf equal 0.0
+variable        Pi equal 0.0
+variable        dump_pos_vel equal 5000000
+variable        dump_collect equal 100000
+variable        xwall_hi equal 9.9404   
+variable        ywall_hi equal 9.9404   
+variable        zwall_hi equal 9.9404  
+variable        xwall_lo equal -9.9404  
+variable        ywall_lo equal -9.9404  
+variable        zwall_lo equal -9.9404  
+variable        thermo_dump equal 1000
+variable        z_vel equal 0.005
+variable        dt equal 0.005
+
+
+
+#read_data conf.dat
+read_restart restart_init.res
+reset_timestep 0
+
+
+#setting up bonds and pair potentials
+
+bond_style      fene
+pair_style     lj/cut  2.5 
+
+special_bonds fene dihedral no
+
+pair_modify     shift   yes
+
+bond_coeff      1       30      1.5     1.0     1.0     
+
+pair_coeff      1 1   1.0 1.0   2.5
+
+
+
+#setting  up outputs
+thermo_style custom step temp press pe ke etotal epair ebond lx ly lz vol
+thermo ${thermo_dump}
+thermo_modify  flush yes
+
+#groups
+group polymer type 1
+
+#read_dump all_pos_vel_eq.dat  read_dump_step_xxxxxxxxxx x y z vx vy vz
+
+timestep ${dt}
+#minimize 1.0e-4 1.0e-6 1000 10000
+
+fix 4 all deform 1 x final ${xwall_lo} ${xwall_hi}  y final ${ywall_lo} ${ywall_hi}    z final ${zwall_lo} ${zwall_hi} 
+fix     3       all     nvt     temp    ${Tf} ${Tf} $(100.0*dt)
+run 1000000
+unfix 4
+
+fix 1 all momentum 1000 linear 1 1 1 angular
+fix     3       all     nvt     temp    ${Tf} ${Tf} $(100.0*dt)
+run 10000000
+
+variable runid loop 50
+
+label runloop
+
+  write_restart  logdata_file1.res
+  reset_timestep 0
+  dump 2 all custom 1000 dump.pos.${runid} id type mol x y z vx vy vz
+  variable s equal logfreq(1,1,2)
+  dump_modify 2 every v_s first yes
+  run 1048576
+  #write_restart logdata_run${runid}.res
+  write_restart logdata_file2.res 
+  restart 0
+
+  undump 2
+  variable s delete
+ 
+  next runid
+  jump polymer.in runloop
+ 
+
+
